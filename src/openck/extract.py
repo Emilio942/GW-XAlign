@@ -6,6 +6,8 @@ import os
 import numpy as np
 import torch
 
+from openck.registry import layer_indices
+
 CACHE = "data_open"
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 
