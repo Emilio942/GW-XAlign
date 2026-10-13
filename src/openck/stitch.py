@@ -41,6 +41,8 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
     """Returns dict with target/stitched losses on held-out text."""
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(hfA)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     mA = AutoModelForCausalLM.from_pretrained(
         hfA, torch_dtype=torch.float16).to(DEV).eval()
     mB = AutoModelForCausalLM.from_pretrained(

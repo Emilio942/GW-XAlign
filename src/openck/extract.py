@@ -15,6 +15,8 @@ DEV = "cuda" if torch.cuda.is_available() else "cpu"
 def _load_text(model_id: str, model_type: str):
     from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(model_id)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     if model_type == "causal":
         model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16)
     else:
