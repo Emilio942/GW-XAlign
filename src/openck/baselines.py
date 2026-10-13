@@ -59,7 +59,12 @@ def baseline_random_map(ZA, ZB, yB, yA, k=10, seed=0):
     from sklearn.neighbors import KNeighborsClassifier
     rng = np.random.default_rng(seed)
     dA, dB = ZA.shape[1], ZB.shape[1]
-    Q, _ = np.linalg.qr(rng.normal(size=(dA, dB)))
-    B = (ZA - ZA.mean(0)) @ Q + ZB.mean(0)
+    if dA >= dB:
+        Q, _ = np.linalg.qr(rng.normal(size=(dA, dB)))       # (dA, dB) orthonormal cols
+        B = (ZA - ZA.mean(0)) @ Q
+    else:
+        Q, _ = np.linalg.qr(rng.normal(size=(dB, dA)))       # (dB, dA) orthonormal cols
+        B = (ZA - ZA.mean(0)) @ Q.T                          # (dA, dB) orthonormal rows
+    B = B + ZB.mean(0)
     knn = KNeighborsClassifier(n_neighbors=k).fit(ZB, yB)
     return float(knn.score(B, yA))
