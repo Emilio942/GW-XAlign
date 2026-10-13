@@ -123,7 +123,7 @@ def main():
     rows = []
     if os.path.exists(RES):
         rows = json.load(open(RES))["rows"]
-    done = {(r["tag"], r.get("depth")) for r in rows}
+    done = {(r["tag"].split("|")[0], r.get("depth")) for r in rows}
 
     for name, mA, mB, family in PAIRS:
         vision = family == "vision"
@@ -132,7 +132,7 @@ def main():
             layer_indices(meta[mA]["n_layers"])
         lb = meta[mB]["layers"] if "layers" in meta[mB] else \
             layer_indices(meta[mB]["n_layers"])
-        yA_, yB_ = (vyA, vyO) if vision else (yA, yA)
+        yA_, yB_ = (vyA, vyA) if vision else (yA, yA)
         ZB_by_layer = {li: load_acts(mB, mod, "cls" if vision else "mean", li)
                        for li in lb}
         for j in range(min(len(la), len(lb))):
