@@ -132,10 +132,9 @@ def main():
             layer_indices(meta[mA]["n_layers"])
         lb = meta[mB]["layers"] if "layers" in meta[mB] else \
             layer_indices(meta[mB]["n_layers"])
-        yA_, yB_ = (vyA, vyB) if vision else (yA, yA)
+        yA_, yB_ = (vyA, vyO) if vision else (yA, yA)
         ZB_by_layer = {li: load_acts(mB, mod, "cls" if vision else "mean", li)
                        for li in lb}
-        yB_ = vyB if vision else yA
         for j in range(min(len(la), len(lb))):
             dep = round((j + 1) / min(len(la), len(lb)), 2)
             if (name, dep) in done:
@@ -147,12 +146,6 @@ def main():
             rec.update(depth=dep, family=family, modelA=mA, modelB=mB,
                        layerA=int(la[j]), layerB=int(lb[j]),
                        elapsed=time.time() - t0)
-            # OOS zero-shot for all pairs with source OOS points
-            ZO = (vO if vision else tO)
-            if not vision:
-                # text OOS: activations not extracted for OOS subset; use align
-                # subset split instead (consistent with Exp E protocol)
-                pass
             with open(RES, "w") as f:
                 json.dump(dict(rows=rows), f, indent=2, default=float)
 
