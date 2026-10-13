@@ -33,11 +33,19 @@ def baseline_relative_representations(ZA, ZB, yB, yA, n_anchors=256, k=10, seed=
 
 
 def baseline_naive_ot(ZA, ZB, yB, yA, k=10, eps=0.02):
-    """Standard entropic Wasserstein on euclidean distances (ignores GW structure)."""
+    """Standard entropic Wasserstein on euclidean distances (ignores GW structure).
+
+    NOTE: under dimension mismatch (dA != dB) euclidean geometry between the
+    two clouds is undefined; we zero-pad the smaller side, which makes the
+    cost degenerate (no cross term). The resulting baseline is therefore
+    expected to be weak exactly in the mismatch regime — that gap is what
+    GW alignment fills (RQ3)."""
     import ot
     from sklearn.neighbors import KNeighborsClassifier
-    d2 = (np.sum(ZA**2, axis=1)[:, None] + np.sum(ZB**2, axis=1)[None, :]
-          - 2.0 * (ZA @ ZB.T))
+    d = max(ZA.shape[1], ZB.shape[1])
+    XA, XB = _pad_to(ZA, d), _pad_to(ZB, d)
+    d2 = (np.sum(XA**2, axis=1)[:, None] + np.sum(XB**2, axis=1)[None, :]
+          - 2.0 * (XA @ XB.T))
     C = np.sqrt(np.maximum(d2, 0.0))
     C = C / (C.max() + 1e-9)
     T = ot.sinkhorn(unit(len(ZA)), unit(len(ZB)), C, reg=eps)
