@@ -34,11 +34,11 @@ DEV = "cuda"
 def load_text_data():
     from datasets import load_dataset
     rng = np.random.default_rng(0)
-    ds = load_dataset("ag_news", split="train")
+    ds = load_dataset("fancyzhx/ag_news", split="train")
     idx = rng.choice(len(ds), N_ALIGN + N_OOS, replace=False)
     texts = [ds[int(i)]["text"] for i in idx]
     labels = np.array([ds[int(i)]["label"] for i in idx])
-    wt = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+    wt = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="test")
     sents = [t for t in wt["text"] if len(t) > 120][:600]
     return texts[:N_ALIGN], labels[:N_ALIGN], texts[N_ALIGN:], labels[N_ALIGN:], sents
 
