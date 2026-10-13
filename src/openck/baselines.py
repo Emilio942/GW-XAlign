@@ -10,13 +10,22 @@ def _l2(Z):
     return Z / (np.linalg.norm(Z, axis=1, keepdims=True) + 1e-8)
 
 
+def _pad_to(Z, d):
+    """Zero-pad features to dimension d (cosine-invariant)."""
+    if Z.shape[1] >= d:
+        return Z
+    return np.hstack([Z, np.zeros((len(Z), d - Z.shape[1]), dtype=Z.dtype)])
+
+
 def baseline_relative_representations(ZA, ZB, yB, yA, n_anchors=256, k=10, seed=0):
     """Moschella et al. (2023): represent samples via similarities to anchors,
-    kNN-classify in the shared relative space."""
+    kNN-classify in the shared relative space. Dimension mismatch is handled
+    by zero-padding source and anchors to a common dimension (cosine-invariant)."""
     from sklearn.neighbors import KNeighborsClassifier
     rng = np.random.default_rng(seed)
     anchors = ZB[rng.choice(len(ZB), min(n_anchors, len(ZB)), replace=False)]
-    a_n, b_n, an_n = _l2(ZA), _l2(ZB), _l2(anchors)
+    d = max(ZA.shape[1], ZB.shape[1])
+    a_n, b_n, an_n = _l2(_pad_to(ZA, d)), _l2(ZB), _l2(_pad_to(anchors, d))
     RA = a_n @ an_n.T          # (nA, anchors)
     RB = b_n @ an_n.T          # (nB, anchors)
     knn = KNeighborsClassifier(n_neighbors=k).fit(RB, yB)
