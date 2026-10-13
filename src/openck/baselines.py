@@ -35,9 +35,10 @@ def baseline_relative_representations(ZA, ZB, yB, yA, n_anchors=256, k=10, seed=
 def baseline_naive_ot(ZA, ZB, yB, yA, k=10, eps=0.02):
     """Standard entropic Wasserstein on euclidean distances (ignores GW structure)."""
     import ot
-    from scipy.spatial.distance import cdist
     from sklearn.neighbors import KNeighborsClassifier
-    C = cdist(ZA, ZB)
+    d2 = (np.sum(ZA**2, axis=1)[:, None] + np.sum(ZB**2, axis=1)[None, :]
+          - 2.0 * (ZA @ ZB.T))
+    C = np.sqrt(np.maximum(d2, 0.0))
     C = C / (C.max() + 1e-9)
     T = ot.sinkhorn(unit(len(ZA)), unit(len(ZB)), C, reg=eps)
     B = (T / unit(len(ZA))[:, None]) @ ZB
