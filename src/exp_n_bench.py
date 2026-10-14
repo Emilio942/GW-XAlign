@@ -45,21 +45,27 @@ def load_lambada(n=400):
     ds = load_dataset("EleutherAI/lambada_openai", "en", split="test")
     rng = np.random.default_rng(0)
     rows = []
+    sample_texts = [ds[int(i)]["text"] for i in rng.choice(len(ds), 20,
+                                                           replace=False)]
+    vocab = list({w for t in sample_texts for w in t.split()})
     for i in rng.choice(len(ds), min(n, len(ds)), replace=False):
         t = ds[int(i)]["text"]
         words = t.split()
         ctx, target = " ".join(words[:-1]), words[-1]
-        distr = [w for w in set(" ".join(rng.choice(ds["text"], 8).split())
-                                .split()) if w != target][:3]
-        while len(distr) < 3:
-            distr.append("word")
-        rows.append(_mc(ctx, distr + [target], 3))
+        distr = [w for w in vocab if w != target][:0]
+        cand = list(set(vocab) - {target})
+        distr = [cand[k] for k in rng.choice(len(cand), 3, replace=False)]
+        rows.append(_mc(ctx, list(distr) + [target], 3))
     return "lambada", rows
 
 
 def load_piqa(n=400):
     from datasets import load_dataset
-    ds = load_dataset("ybisk/piqa", split="test", trust_remote_code=True)
+    try:
+        ds = load_dataset("baber/piqa", split="test")
+    except Exception:
+        ds = load_dataset("ybisk/piqa", split="test",
+                          trust_remote_code=True)
     rng = np.random.default_rng(0)
     rows = []
     for i in rng.choice(len(ds), min(n, len(ds)), replace=False):
