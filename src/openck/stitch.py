@@ -90,7 +90,7 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
             hsA = mA(input_ids=ids, attention_mask=mask,
                      output_hidden_states=True).hidden_states[layer_idx]
         ZA = hsA.float().cpu().numpy().reshape(-1, hsA.shape[-1])
-        ZB_mapped = map_tokens(ZA).reshape(hsA.shape)
+        ZB_mapped = map_tokens(ZA).reshape(hsA.shape[0], hsA.shape[1], HB.shape[1])
         mapped = torch.tensor(ZB_mapped, dtype=hsA.dtype, device=DEV)
 
         holder = {}
