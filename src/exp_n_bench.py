@@ -263,12 +263,14 @@ def main():
         hfA, hfB = TEXT_MODELS[mA][0], TEXT_MODELS[mB][0]
         tokA, modA = get(mA, hfA)
         tokB, modB = get(mB, hfB)
-        nL = len(_decoder_layers(modB))
-        li = max(1, round(dep * nL))
-        ck = (mA, mB, li)
+        nLA = len(_decoder_layers(modA))
+        nLB = len(_decoder_layers(modB))
+        src_layer = max(1, round(dep * nLA))       # hidden_states index in A
+        li = max(1, round(dep * nLB))              # hidden_states index in B
+        ck = (mA, mB, dep)
         if ck not in maps:
             t0 = time.time()
-            HA = _token_acts(modA, tokA, sents, li)
+            HA = _token_acts(modA, tokA, sents, src_layer)
             HB = _token_acts(modB, tokB, sents, li)
             D1 = normalize_diameter(euclidean_distance_matrix(HA))
             D2 = normalize_diameter(euclidean_distance_matrix(HB))
@@ -276,13 +278,13 @@ def main():
             rngp = np.random.default_rng(5)
             Ts = T[rngp.permutation(len(T))]
             maps[ck] = (HA.copy(), HB.copy(), T, Ts)
-            print(f"[map] {name} l={li} ({time.time()-t0:.0f}s)", flush=True)
+            print(f"[map] {name} d={dep} src_l={src_layer} dst_l={li} "
+                  f"({time.time()-t0:.0f}s)", flush=True)
         HA, HB, T, Ts = maps[ck]
         p = unit(len(HA))
         map_stitch = make_batch_map(HA, HB, T, p)
         map_shuffle = make_batch_map(HA, HB, Ts, p)
         hook_layer = _decoder_layers(modB)[max(0, li - 1)]
-        src_layer = max(0, li - 1)
 
         for bench, recs in benches:
             if (name, dep, bench) in done:
