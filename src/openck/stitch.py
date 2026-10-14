@@ -18,6 +18,17 @@ from gwxalign.core import (out_of_sample_map, solve_egw_gpu, unit,
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def _decoder_layers(m):
+    """Return the decoder layer list for common HF causal LMs."""
+    if hasattr(m, "gpt_neox"):
+        return m.gpt_neox.h
+    if hasattr(m, "transformer"):
+        return m.transformer.h
+    if hasattr(m, "model") and hasattr(m.model, "layers"):
+        return m.model.layers
+    raise AttributeError("cannot locate decoder layers")
+
+
 def _token_acts(model, tok, texts, layer_idx, max_len=128, n_max=1500, batch=16):
     """Returns (hidden_states (M,d) float32 for M sampled token positions)."""
     hs_all = []
@@ -62,7 +73,8 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
         return np.stack([out_of_sample_map(x, HA, HB, T, p) for x in ZA])
 
     # 3) eval: held-out batches, replace layer output in B
-    layer = mB.model.h[layer_idx]        # GPTNeoX / GPT-2 use .h as layer list
+    # hidden_states[li] is the OUTPUT of decoder layer li-1 (hs[0] = embeddings)
+    hook_layer = _decoder_layers(mB)[max(0, layer_idx - 1)]
     results = {"target_loss": [], "stitched_loss": []}
     for i in range(0, min(len(texts_eval), 400), 16):
         enc = tok(texts_eval[i:i + 16], return_tensors="pt", truncation=True,
@@ -88,7 +100,7 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
             holder["saved"] = out.detach().clone()
             return mapped
 
-        handle = layer.register_forward_hook(hook)
+        handle = hook_layer.register_forward_hook(hook)
         try:
             res2 = mB(input_ids=ids, attention_mask=mask, labels=ids)
         finally:
