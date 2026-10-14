@@ -82,7 +82,9 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
         enc = tok(texts_eval[i:i + 16], return_tensors="pt", truncation=True,
                   max_length=max_len, padding=True).to(DEV)
         ids, mask = enc["input_ids"], enc["attention_mask"]
-        res = mB(input_ids=ids, attention_mask=mask, labels=ids)
+        labels = ids.clone()
+        labels[mask == 0] = -100            # exclude padding from the loss
+        res = mB(input_ids=ids, attention_mask=mask, labels=labels)
         results["target_loss"].append(float(res.loss))
 
         # source activations at layer for the SAME tokens (same tokenizer!)
@@ -104,7 +106,7 @@ def stitch_pair(hfA, hfB, layer_idx, texts_align, texts_eval, eps=0.02,
 
         handle = hook_layer.register_forward_hook(hook)
         try:
-            res2 = mB(input_ids=ids, attention_mask=mask, labels=ids)
+            res2 = mB(input_ids=ids, attention_mask=mask, labels=labels)
         finally:
             handle.remove()
         results["stitched_loss"].append(float(res2.loss))
