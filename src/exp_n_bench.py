@@ -57,14 +57,13 @@ def load_lambada(n=400):
 
 def load_piqa(n=400):
     from datasets import load_dataset
-    try:
-        ds = load_dataset("baber/piqa", split="test")
-    except Exception:
-        ds = load_dataset("ybisk/piqa", split="test", trust_remote_code=True)
+    ds = load_dataset("baber/piqa", split="validation")   # test labels are -1
     rng = np.random.default_rng(0)
     rows = []
     for i in rng.choice(len(ds), min(n, len(ds)), replace=False):
         r = ds[int(i)]
+        if int(r["label"]) not in (0, 1):
+            continue
         rows.append(_mc(r["goal"], [r["sol1"], r["sol2"]], r["label"]))
     return "piqa", rows
 
@@ -183,31 +182,32 @@ def mc_accuracy(model, tok, recs, injector=None, max_len=512, batch=8):
                                 else out.dtype, device=DEV)
         hnd = hook_layer.register_forward_hook(hook)
     try:
-        for i in range(0, len(recs), batch):
-            chunk = recs[i:i + batch]
-            nch = len(chunk[0]["choices"])
-            lls = np.zeros((len(chunk), nch))
-            for ci in range(nch):
-                prompts = [r["ctx"] + r["choices"][ci] for r in chunk]
-                ctxs = [r["ctx"] for r in chunk]
-                enc = tok(prompts, return_tensors="pt", truncation=True,
-                          max_length=max_len, padding=True).to(DEV)
-                ect = tok(ctxs, return_tensors="pt", truncation=True,
-                          max_length=max_len, padding=True).to(DEV)
-                out = model(input_ids=enc["input_ids"],
-                            attention_mask=enc["attention_mask"])
-                for b in range(len(chunk)):
-                    n_ctx = int(ect["attention_mask"][b].sum())
-                    n_tok = int(enc["attention_mask"][b].sum())
-                    if n_tok <= n_ctx:
-                        lls[b, ci] = -1e9
-                        continue
-                    lls[b, ci] = _ll_of_choice(out.logits[b].float(),
-                                               enc["input_ids"][b], None,
-                                               n_ctx, n_tok)
-            pred = lls.argmax(1)
-            correct += int(sum(pred[b] == chunk[b]["label"]
-                               for b in range(len(chunk))))
+        for nch in sorted(set(len(r["choices"]) for r in recs)):
+            sub = [r for r in recs if len(r["choices"]) == nch]
+            for i in range(0, len(sub), batch):
+                chunk = sub[i:i + batch]
+                lls = np.zeros((len(chunk), nch))
+                for ci in range(nch):
+                    prompts = [r["ctx"] + r["choices"][ci] for r in chunk]
+                    ctxs = [r["ctx"] for r in chunk]
+                    enc = tok(prompts, return_tensors="pt", truncation=True,
+                              max_length=max_len, padding=True).to(DEV)
+                    ect = tok(ctxs, return_tensors="pt", truncation=True,
+                              max_length=max_len, padding=True).to(DEV)
+                    out = model(input_ids=enc["input_ids"],
+                                attention_mask=enc["attention_mask"])
+                    for b in range(len(chunk)):
+                        n_ctx = int(ect["attention_mask"][b].sum())
+                        n_tok = int(enc["attention_mask"][b].sum())
+                        if n_tok <= n_ctx:
+                            lls[b, ci] = -1e9
+                            continue
+                        lls[b, ci] = _ll_of_choice(out.logits[b].float(),
+                                                   enc["input_ids"][b], None,
+                                                   n_ctx, n_tok)
+                pred = lls.argmax(1)
+                correct += int(sum(pred[b] == chunk[b]["label"]
+                                   for b in range(len(chunk))))
     finally:
         if hnd is not None:
             hnd.remove()
