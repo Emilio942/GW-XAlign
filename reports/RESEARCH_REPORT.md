@@ -22,6 +22,7 @@ Thirteen experiment suites (A–L) were run to test the GW-XAlign research progr
 | J | Deleted-edge fragmentation | **No repair from D1 alone works** (de-offset, MDS-imputation all fail) — fundamental obstruction requiring anchors |
 | L | External validity (ViT/Mixer/CNN on CIFAR-10) | Zero-shot cross-family transfer works (ViT→CNN reaches **85% of ceiling**); the GW↔loss law **attenuates** (−0.64) and admits violations when the target feature space is intrinsically weakly class-structured |
 | M | Open checkpoints on V100 (Pythia/GPT-2/Qwen/switch-MoE/ViT-DINO) | **Replicates at pretrained scale**: last-layer transfer up to **0.877**; under dimension mismatch baselines sit at chance while GW reaches 0.46 avg (**RQ3's strongest evidence**); law weak-but-significant (ρ = −0.33); token-level stitching injects usable signal into frozen LMs (PPL 3.1 → 8.8) |
+| N | End-to-end benchmarks through stitched models (7-rung difficulty ladder, shuffled-control) | **The functional cliff**: stitched models collapse immediately on every difficulty rung (mean 0.62× ceiling) and perform identically to a correspondence-destroyed control (9/35 wins). **Structural alignment ≠ functional stitching** — the zero-shot GW map transfers geometry, not operational usability. A trained connector is the missing piece |
 
 **Headline findings**
 
@@ -172,7 +173,32 @@ Other observations: ε is nearly free on clean real data (accuracy varies < 0.05
 
 Crude zero-shot token transport (sentence-fit KDE map applied per token) injects usable information into a frozen target LM: stitched PPL stays within a factor of ~3 of the target despite zero supervision. The best pair (410m→1.4b) is also the one with the highest class-transfer accuracy — directionally consistent with the GW↔loss law, though n = 4 pairs is anecdotal.
 
-**Verdict on external validity.** The core phenomenon (zero-shot GW alignment carries semantic structure across real pretrained architectures, and GW divergence weakly-but-significantly orders transfer quality) **replicates at open-checkpoint scale**; the strong MNIST-form of the law (ρ ≈ −0.9) does not. The practically dominant finding is RQ3: GW is the only method in the comparison that functions at all under dimension mismatch.
+## 8.6 Exp N — Benchmarks through stitched models (V100): the functional cliff
+
+**Setup.** The user-requested end-to-end test: run actual benchmarks *through* the stitched model. Difficulty ladder of 7 log-likelihood multiple-choice benchmarks (LAMBADA → PIQA → SciQ → ARC-Easy → ARC-Challenge → HellaSwag → GSM8K-solution-discrimination on the user's 200-problem set), 5 same-tokenizer pair/depth combos (Pythia family, GPT-2 family), 4 conditions each: intact A, intact B (ceiling), stitched A→B (zero-shot GW map at matched relative depth, 35 configs), and a **shuffled-coupling control** (correspondence destroyed, marginal statistics preserved).
+
+**Results (mean over 5 combos):**
+
+| benchmark | intact A | intact B | stitched | shuffled | stitched/ceiling |
+|---|---|---|---|---|---|
+| lambada | 0.707 | 0.811 | 0.127 | 0.128 | 0.16 |
+| piqa | 0.641 | 0.676 | 0.546 | 0.556 | 0.81 |
+| sciq | 0.373 | 0.428 | 0.223 | 0.223 | 0.52 |
+| ARC-Easy | 0.410 | 0.467 | 0.292 | 0.290 | 0.63 |
+| ARC-Challenge | 0.214 | 0.229 | 0.219 | 0.217 | 0.96 |
+| hellaswag | 0.259 | 0.306 | 0.217 | 0.217 | 0.71 |
+| gsm8k_sd | 0.968 | 0.990 | 0.539 | 0.594 | 0.54 |
+
+Mean stitched/ceiling = **0.62**; shuffled/ceiling = **0.63**; stitched beats shuffled in only **9/35** configs.
+
+**Findings — and they are negative in an informative way:**
+1. **The breakdown is a cliff, not a slope.** There is no progressive degradation with benchmark difficulty: injection immediately destroys most of B's function on every rung (0.16× on lambada up to 0.96× on ARC-C, where the intact models are at chance anyway). On LAMBADA the stitched model lands *below* chance (0.127 < 0.25) — injected states actively mislead B's downstream layers.
+2. **GW map ≡ shuffled control.** The stitched model performs indistinguishably from the correspondence-destroyed control. The GW coupling's *correspondence* — which demonstrably exists in feature space (Exp M: 0.82–0.88 kNN transfer) — contributes **nothing** to functional transfer.
+3. **The reconciliation of Exp M and Exp N is the finding**: zero-shot GW transport preserves *geometry* (neighborhoods in feature space) but not *function* (operational usability by the target's downstream computation). B's residual stream expects inputs in its own statistical regime; mapped states carry A's regime, and B's frozen layers systematically misread them. Structural alignment ≠ functional stitching.
+
+**Consequence.** Zero-shot GW stitching is *not* a drop-in model-merge technique. Its demonstrated value is structural (analysis, matching, feature-space transfer, dimension-mismatch robustness) and as an *initialization* — the stitching literature closes the functional gap with a small trained connector, for which the GW map is a natural warm start. Testing "GW-init + light connector training" is the clearly indicated next experiment; it was out of scope here (would require gradient training, fine on the V100, ~1 day).
+
+**Verdict on external validity.** The core phenomenon (zero-shot GW alignment carries semantic structure across real pretrained architectures, and GW divergence weakly-but-significantly orders transfer quality) **replicates at open-checkpoint scale**; the strong MNIST-form of the law (ρ ≈ −0.9) does not. The practically dominant finding is RQ3: GW is the only method in the comparison that functions at all under dimension mismatch. Functionally, however, zero-shot stitching is not usable as a drop-in replacement (Exp N).
 
 ## 9. Exp H/H2 — Debiased EGW
 
