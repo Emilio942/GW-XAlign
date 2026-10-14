@@ -19,13 +19,15 @@ DEV = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def _decoder_layers(m):
-    """Return the decoder layer list for common HF causal LMs."""
-    if hasattr(m, "gpt_neox"):
-        return m.gpt_neox.h
-    if hasattr(m, "transformer"):
-        return m.transformer.h
-    if hasattr(m, "model") and hasattr(m.model, "layers"):
-        return m.model.layers
+    """Return the decoder layer list for common HF causal LMs
+    (transformers 4.x: .gpt_neox.h / .transformer.h; 5.x: .layers)."""
+    for pre in ("gpt_neox", "transformer", "model"):
+        inner = getattr(m, pre, None)
+        if inner is None:
+            continue
+        for name in ("h", "layers"):
+            if hasattr(inner, name):
+                return getattr(inner, name)
     raise AttributeError("cannot locate decoder layers")
 
 
