@@ -178,8 +178,7 @@ def mc_accuracy(model, tok, recs, injector=None, max_len=512, batch=8):
                             output_hidden_states=True
                             ).hidden_states[src_layer]
             ZA = hsA.float().cpu().numpy().reshape(-1, hsA.shape[-1])
-            Zm = np.stack([mapfn(x) for x in ZA]).reshape(
-                hsA.shape[0], hsA.shape[1], -1)
+            Zm = mapfn(ZA).reshape(hsA.shape[0], hsA.shape[1], -1)
             return torch.tensor(Zm, dtype=out[0].dtype if isinstance(out, tuple)
                                 else out.dtype, device=DEV)
         hnd = hook_layer.register_forward_hook(hook)
@@ -216,6 +215,26 @@ def mc_accuracy(model, tok, recs, injector=None, max_len=512, batch=8):
 
 
 # ---------------------------------------------------------------- main
+def make_batch_map(HA, HB, T, p, k=10):
+    """Vectorized adaptive-bandwidth KDE map for ALL tokens at once.
+    Same semantics as gwxalign.core.out_of_sample_map per token."""
+    HA2 = np.sum(HA**2, axis=1)
+
+    def map_all(X):
+        d2 = (np.sum(X**2, axis=1)[:, None] + HA2[None, :]
+              - 2.0 * (X @ HA.T))
+        np.maximum(d2, 0.0, out=d2)
+        sigma2 = 2.0 * np.partition(d2, min(k, d2.shape[1] - 1),
+                                    axis=1)[:, min(k, d2.shape[1] - 1)]
+        sigma2 = np.maximum(sigma2, 1e-12)
+        W = np.exp(-d2 / sigma2[:, None])
+        wp = W @ (T / p[:, None])
+        s = wp.sum(axis=1, keepdims=True)
+        s[s <= 0] = 1.0
+        return (wp / s) @ HB
+    return map_all
+
+
 def main():
     benches = load_all()
     rows = []
@@ -260,8 +279,8 @@ def main():
             print(f"[map] {name} l={li} ({time.time()-t0:.0f}s)", flush=True)
         HA, HB, T, Ts = maps[ck]
         p = unit(len(HA))
-        map_stitch = lambda x: out_of_sample_map(x, HA, HB, T, p)
-        map_shuffle = lambda x: out_of_sample_map(x, HA, HB, Ts, p)
+        map_stitch = make_batch_map(HA, HB, T, p)
+        map_shuffle = make_batch_map(HA, HB, Ts, p)
         hook_layer = _decoder_layers(modB)[max(0, li - 1)]
         src_layer = max(0, li - 1)
 
